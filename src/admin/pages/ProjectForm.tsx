@@ -14,7 +14,8 @@ import {
   MessageSquare,
   TrendingUp,
 } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
+import { useProject, useCreateProject, useUpdateProject } from '../hooks/useProjects';
+import { toast } from 'react-hot-toast';
 import ImageUploader from '../components/common/ImageUploader';
 
 /**
@@ -70,8 +71,12 @@ const ProjectForm: React.FC = () => {
   const navigate = useNavigate();
   const isEditMode = !!id;
 
+  // Hooks React Query
+  const { data: projectData, isLoading: loadingData } = useProject(id || null);
+  const createMutation = useCreateProject();
+  const updateMutation = useUpdateProject();
+
   const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(isEditMode);
   const [activeTab, setActiveTab] = useState('basic');
   
   // Nouveau champ pour la technologie à ajouter
@@ -122,83 +127,54 @@ const ProjectForm: React.FC = () => {
 
   // Charger les données en mode édition
   useEffect(() => {
-    if (isEditMode && id) {
-      loadProject(id);
-    }
-  }, [id, isEditMode]);
-
-  const loadProject = async (projectId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', projectId)
-        .single();
-
-      if (error) throw error;
-
+    if (projectData) {
       setFormData({
-        title: data.title || '',
-        description: data.description || '',
-        image: data.image || '',
-        tech: data.tech || [],
-        results: data.results || [],
-        link: data.link || '#',
-        content_project_modal: data.content_project_modal || formData.content_project_modal,
+        title: projectData.title || '',
+        description: projectData.description || '',
+        image: projectData.image || '',
+        tech: projectData.tech || [],
+        results: projectData.results || [],
+        link: projectData.link || '#',
+        content_project_modal: projectData.content_project_modal || formData.content_project_modal,
       });
-    } catch (error) {
-      console.error('Erreur chargement projet:', error);
-      alert('Erreur lors du chargement du projet');
-    } finally {
-      setLoadingData(false);
     }
-  };
+  }, [projectData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      const projectData = {
+        title: formData.title,
+        description: formData.description,
+        image: formData.image,
+        tech: formData.tech,
+        results: formData.results,
+        link: formData.link,
+        content_project_modal: formData.content_project_modal,
+      };
+
       if (isEditMode && id) {
         // Mise à jour
-        const { error } = await supabase
-          .from('projects')
-          .update({
-            title: formData.title,
-            description: formData.description,
-            image: formData.image,
-            tech: formData.tech,
-            results: formData.results,
-            link: formData.link,
-            content_project_modal: formData.content_project_modal,
-          })
-          .eq('id', id);
-
-        if (error) throw error;
-        alert('✅ Projet modifié avec succès !');
+        await updateMutation.mutateAsync({
+          id,
+          data: projectData,
+        });
+        toast.success('✅ Projet modifié avec succès !');
       } else {
         // Création
-        const { error } = await supabase
-          .from('projects')
-          .insert({
-            id: formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-            title: formData.title,
-            description: formData.description,
-            image: formData.image,
-            tech: formData.tech,
-            results: formData.results,
-            link: formData.link,
-            content_project_modal: formData.content_project_modal,
-          });
-
-        if (error) throw error;
-        alert('✅ Projet créé avec succès !');
+        await createMutation.mutateAsync({
+          id: formData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          ...projectData,
+        });
+        toast.success('✅ Projet créé avec succès !');
       }
 
       navigate('/admin/projects');
     } catch (error: any) {
       console.error('Erreur:', error);
-      alert(`❌ Erreur: ${error.message}`);
+      toast.error(`❌ Erreur: ${error.message || 'Une erreur est survenue'}`);
     } finally {
       setLoading(false);
     }

@@ -12,8 +12,8 @@ import {
   Calendar,
   Tag,
 } from 'lucide-react';
-import { useProjects } from '../../lib/useSupabaseData';
-import { supabase } from '../../lib/supabaseClient';
+import { useProjects, useDeleteProject } from '../hooks/useProjects';
+import { toast } from 'react-hot-toast';
 
 /**
  * Page admin de gestion des projets
@@ -33,7 +33,8 @@ interface Project {
 }
 
 const Projects: React.FC = () => {
-  const { data: projects, loading, refetch } = useProjects();
+  const { data: projects, isLoading: loading } = useProjects();
+  const deleteMutation = useDeleteProject();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTech, setSelectedTech] = useState<string>('');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -67,19 +68,12 @@ const Projects: React.FC = () => {
   // Supprimer un projet
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      alert('✅ Projet supprimé avec succès !');
-      refetch();
+      await deleteMutation.mutateAsync(id);
+      toast.success('✅ Projet supprimé avec succès !');
       setDeleteConfirm(null);
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
-      alert('❌ Erreur lors de la suppression du projet');
+      toast.error('❌ Erreur lors de la suppression du projet');
     }
   };
 
